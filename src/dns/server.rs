@@ -31,7 +31,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::event;
-use tracing::{debug, info, instrument, trace, warn};
+use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::proxy::{LocalWorkloadFetcher, SocketFactory};
 
@@ -429,13 +429,23 @@ impl Store {
                 // be a pod FQDN - try to lookup in workload registry.
                 trace!("checking headless svc {:#?}", alias);
 
-                let pod_name = alias.name.iter().next().expect("at least one label");
-                let pod_name = str::from_utf8(pod_name).expect("label is utf8");
+                let Some(pod_name) = alias.name.iter().next() else {
+                    error!("expected {alias} to have at least one label");
+                    continue;
+                };
+                let pod_name = match str::from_utf8(pod_name) {
+                    Ok(pod_name) => pod_name,
+                    Err(e) => {
+                        error!("expected {:#?} to be valid utf8: {e}", pod_name);
+                        continue;
+                    }
+                };
 
                 let service_suffix = alias.name.base_name().to_utf8();
-                let service_suffix = service_suffix
-                    .strip_suffix('.')
-                    .expect("the svc domain must have a trailing '.'");
+                let Some(service_suffix) = service_suffix.strip_suffix('.') else {
+                    error!("expected {service_suffix} to have a trailing '.'");
+                    continue;
+                };
 
                 let cluster_local_domain = self.kubernetes_cluster_local_domain();
                 if let Some(wl) = HeadlessServiceMatch::find_best_match(
