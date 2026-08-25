@@ -318,22 +318,6 @@ impl Workload {
             zone: (!self.locality.zone.is_empty()).then_some(self.locality.zone.clone()),
         }
     }
-
-    /// Returns true if this workload is associated with a Kubernetes headless service
-    /// matching the given hostname suffix.
-    pub fn backs_headless_service(
-        &self,
-        service_suffix: &str,
-        services: &ServiceStore,
-        cluster_local_domain: &str,
-    ) -> bool {
-        self.services.iter().any(|ns_host| {
-            ns_host.hostname == service_suffix
-                && services
-                    .get_by_namespaced_host(ns_host)
-                    .is_some_and(|svc| svc.is_kubernetes_headless(cluster_local_domain))
-        })
-    }
 }
 
 /// Represents the reason a workload was matched during headless pod DNS lookup.
@@ -1314,69 +1298,6 @@ mod tests {
             .cluster_id,
             local
         );
-    }
-
-    #[test]
-    fn backs_headless_service() {
-        use crate::state::service::{EndpointSet, Service};
-        use std::collections::HashMap;
-
-        let cluster_local_domain = ".svc.cluster.local";
-        let mut store = ServiceStore::default();
-        let make_svc = |name: &str, hostname: &str, vips: Vec<NetworkAddress>| Service {
-            name: name.into(),
-            namespace: "ns1".into(),
-            hostname: hostname.into(),
-            vips,
-            cidr_vips: vec![],
-            ports: HashMap::new(),
-            endpoints: EndpointSet::default(),
-            subject_alt_names: vec![],
-            waypoint: None,
-            weighted_waypoints: vec![],
-            load_balancer: None,
-            ip_families: None,
-            canonical: false,
-            visibility: Visibility::Public,
-        };
-        store.insert(make_svc(
-            "headless",
-            "headless.ns1.svc.cluster.local",
-            vec![],
-        ));
-        store.insert(make_svc(
-            "other",
-            "other.ns1.svc.cluster.local",
-            vec![NetworkAddress {
-                network: crate::strng::EMPTY,
-                address: "10.0.0.1".parse().unwrap(),
-            }],
-        ));
-
-        // Workload backed by headless service (no VIP and service domain)
-        let wl = test_workload(
-            "pod-0",
-            "ns1",
-            "Kubernetes",
-            "headless.ns1.svc.cluster.local",
-        );
-        assert!(wl.backs_headless_service(
-            "headless.ns1.svc.cluster.local",
-            &store,
-            cluster_local_domain,
-        ));
-        assert!(!wl.backs_headless_service(
-            "foobar.ns1.svc.cluster.local",
-            &store,
-            cluster_local_domain,
-        ));
-        // Workload backed by service with VIP
-        let wl_vip = test_workload("pod", "ns1", "Kubernetes", "other.ns1.svc.cluster.local");
-        assert!(!wl_vip.backs_headless_service(
-            "other.ns1.svc.cluster.local",
-            &store,
-            cluster_local_domain,
-        ));
     }
 
     #[test]
