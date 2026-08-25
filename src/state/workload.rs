@@ -16,7 +16,6 @@ use crate::identity::Identity;
 
 use crate::baggage::Baggage;
 use crate::state::WorkloadInfo;
-use crate::state::service::ServiceStore;
 use crate::strng::Strng;
 use crate::xds::istio::workload::{Port, PortList};
 use crate::{strng, xds};
