@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::strng;
 use hickory_proto::op::ResponseCode;
 use hickory_proto::rr::rdata::{A, AAAA, CNAME};
 use hickory_proto::rr::{Name, RData, Record, RecordType};
@@ -449,11 +450,12 @@ impl Store {
 
                 let cluster_local_domain = self.kubernetes_cluster_local_domain();
                 if let Some(wl) = HeadlessServiceMatch::find_best_match(
-                    state.workloads.find_headless_pod_workloads(
+                    state.workloads.find_pod_workloads_by_svc(
                         pod_name,
-                        service_suffix,
-                        &state.services,
-                        &cluster_local_domain,
+                        &state.services.get_headless_by_host(
+                            &strng::new(service_suffix),
+                            &cluster_local_domain,
+                        ),
                     ),
                     &client.namespace,
                     &client.cluster_id,

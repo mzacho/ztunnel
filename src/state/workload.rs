@@ -22,7 +22,7 @@ use crate::xds::istio::workload::{Port, PortList};
 use crate::{strng, xds};
 use bytes::Bytes;
 use ipnet::IpNet;
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
@@ -1097,29 +1097,18 @@ impl WorkloadStore {
     }
 
     /// Finds workloads by name that back the given k8s headless service.
-    pub fn find_headless_pod_workloads<'a>(
-        &'a self,
+    pub fn find_pod_workloads_by_svc(
+        &self,
         pod_name: &str,
-        service_suffix: &'a str,
-        services: &'a ServiceStore,
-        cluster_local_domain: &'a str,
-    ) -> impl Iterator<Item = Arc<Workload>> + 'a {
-        let mut headless_svcs = None;
-
-        self.find_by_name(pod_name).filter(move |wl| {
-            // Initialize lazily to avoid looking up services by host if no workload with the pod name is found.
-            let headless_svcs = headless_svcs.get_or_insert_with(|| {
-                services
-                    .get_by_host(&strng::new(service_suffix))
-                    .into_iter()
-                    .flat_map(|svcs| svcs.into_iter())
-                    .filter(|svc| svc.is_kubernetes_headless(cluster_local_domain))
-                    .map(|svc| svc.namespaced_hostname())
-                    .collect_vec()
-            });
-
-            wl.services.iter().any(|svc| headless_svcs.contains(svc))
-        })
+        services: &[NamespacedHostname],
+    ) -> impl Iterator<Item = Arc<Workload>> {
+        if services.is_empty() {
+            return Either::Left(std::iter::empty());
+        }
+        Either::Right(
+            self.find_by_name(pod_name)
+                .filter(|wl| wl.services.iter().any(|svc| services.contains(svc))),
+        )
     }
 
     // was_last_identity_on_node is a specialized function to help determine if we should clear a certificate.

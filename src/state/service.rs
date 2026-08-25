@@ -623,6 +623,19 @@ impl ServiceStore {
         }
     }
 
+    pub fn get_headless_by_host(
+        &self,
+        host: &Strng,
+        cluster_local_domain: &str,
+    ) -> Vec<NamespacedHostname> {
+        self.get_by_host(&strng::new(host))
+            .into_iter()
+            .flat_map(|svcs| svcs.into_iter())
+            .filter(|svc| svc.is_kubernetes_headless(cluster_local_domain))
+            .map(|svc| svc.namespaced_hostname())
+            .collect_vec()
+    }
+
     /// Adds an endpoint for the service VIP.
     /// Applies a batch of endpoint upserts and removals to a single service with
     /// a single clone + single reindex (or a single staged-map update when the
