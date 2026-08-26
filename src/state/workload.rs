@@ -1132,7 +1132,6 @@ pub enum WorkloadError {
 mod tests {
     use super::*;
     use crate::config::ConfigSource;
-    use crate::state::service::Visibility;
     use crate::state::{DemandProxyState, ProxyState, ServiceResolutionMode, UpstreamDestination};
     use crate::test_helpers::helpers::initialize_telemetry;
     use crate::test_helpers::{LOCALHOST_YAML, temp_file_with_content};
